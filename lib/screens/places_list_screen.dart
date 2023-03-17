@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:great_places/helpers/db_helper.dart';
 import 'package:great_places/models/place.dart';
 import 'package:great_places/screens/add_place_screen.dart';
+import 'package:geocoding/geocoding.dart';
 
 class PlacesListScreen extends StatefulWidget {
   const PlacesListScreen({Key? key}) : super(key: key);
@@ -21,23 +22,43 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
     super.initState();
   }
 
-  void addPlace(File image, String title) {
+  Future<void> addPlace(File image, String title, PlaceLocation pickedLocation) async {
+    List<Placemark> placemarks = await placemarkFromCoordinates(pickedLocation.latitude, pickedLocation.longitude);
+    Placemark placeMark = placemarks[0];
+    String? street = placeMark.street;
+    String? locality = placeMark.locality;
+    String? administrativeArea = placeMark.administrativeArea;
+    String? country = placeMark.country;
+    String address = "${street}, ${locality}, ${administrativeArea} , ${country}";
+    final updatedLocation =PlaceLocation(latitude: pickedLocation.latitude, longitude: pickedLocation.longitude, adress: address);
     final newPlace = Place(
       id: DateTime.now().toString(),
       image: image,
       title: title,
-      location: null,
+      location: updatedLocation,
     );
     items.add(newPlace);
     setState(() {});
-    DBHelper.insert('user_places', {'id': newPlace.id, 'title': newPlace.title, 'image': newPlace.image.path});
+    DBHelper.insert('user_places', {
+      'id': newPlace.id,
+      'title': newPlace.title,
+      'image': newPlace.image.path,
+      'loc_lat': newPlace.location!.latitude,
+      'loc_lng': newPlace.location!.longitude,
+      'address': newPlace.location!.adress.toString()
+    });
   }
 
   Future<void> fetchAndSetPlaces() async {
     final dataList = await DBHelper.getData('user_places');
     items = dataList
         .map(
-          (item) => Place(id: item['id'], title: item['title'], image: File(item['image']), location: null),
+          (item) => Place(
+            id: item['id'],
+            title: item['title'],
+            image: File(item['image']),
+            location: PlaceLocation(latitude: item['loc_lat'],longitude: item['loc_lng'], adress: item['address'] ),
+          ),
         )
         .toList();
     setState(() {});
@@ -66,15 +87,16 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
           : FutureBuilder(
               future: fetchAndSetPlaces(),
               builder: (ctx, snapshot) => ListView.builder(
-                      itemCount: items.length,
-                      itemBuilder: (context, index) => ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: FileImage(items[index].image),
-                        ),
-                        title: Text(items[index].title),
-                        onTap: () {},
-                      ),
-                    ),
+                itemCount: items.length,
+                itemBuilder: (context, index) => ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: FileImage(items[index].image),
+                  ),
+                  title: Text(items[index].title),
+                  subtitle: Text(items[index].location!.adress.toString()),
+                  onTap: () {},
+                ),
+              ),
             ),
     );
   }

@@ -14,5 +14,5 @@ class Place{
   final PlaceLocation? location;
   final File image;
 
-  Place({required this.image,required this.title,required this.id,required this.location});
+  const Place({required this.image,required this.title,required this.id,required this.location});
 }
